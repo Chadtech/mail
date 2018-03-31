@@ -1,0 +1,15 @@
+{
+    "version": "1.0.0",
+    "summary": "A request / response model for ports",
+    "repository": "https://github.com/Chadtech/ports-manager.git",
+    "license": "BSD3",
+    "source-directories": [
+        "./elm-src"
+    ],
+    "exposed-modules": [ "Ports.Manager" ],
+    "dependencies": {
+        "elm-lang/core": "5.1.1 <= v < 6.0.0",
+        "elm-lang/html": "2.0.0 <= v < 3.0.0"
+    },
+    "elm-version": "0.18.0 <= v < 0.19.0"
+}
