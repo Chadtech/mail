@@ -2,12 +2,10 @@ module Ports.Manager
     exposing
         ( Error(..)
         , Manager
-        , Request
         , decode
         , encode
         , init
         , jsonRequest
-        , map
         , request
         , update
         )
@@ -21,11 +19,9 @@ import Json.Encode as Encode
 
 
 type alias Manager msg =
-    { threads : Dict String (Decoder msg)
+    { threads : Dict Int (Decoder msg)
     , threadCount : Int
-    , namespace : String
-    , errCtor : Error -> msg
-    , send : Value -> Cmd msg
+    , send : Encode.Value -> Cmd msg
     }
 
 
@@ -33,61 +29,37 @@ type Error
     = IdDecoderFailed String
     | ThreadDoesNotExist
     | SubscriptionDoesNotExist
-    | MsgDecoderFailed String
 
 
-type alias Request a msg =
-    { decoder : Decoder a
-    , msgCtor : a -> msg
-    , outgoingMsg : ( String, Encode.Value )
-    }
-
-
-init : String -> (String -> msg) -> Manager msg
-init namespace errCtor =
+init : (String -> msg) -> Manager msg
+init errCtor =
     { threads = Dict.empty
     , threadCount = 0
-    , namespace = namespace
-    , errCtor = errCtor
     }
 
 
-request : Decoder a -> (a -> msg) -> ( String, Encode.Value ) -> Request
-request =
-    Request
+update : Maybe (Request a msg) -> Manager msg -> ( Manager msg, Cmd msg )
+update maybeRequest manager =
+    case maybeRequest of
+        Just request ->
+            ( { manager
+                | threads =
+                    Dict.set
+                        manager.threadCount
+                        request
+                        manager.threads
+                , threadCount = manager.threadCount + 1
+              }
+            , request.jsMsg
+                |> encode manager.threadCount
+                |> manager.send
+            )
+
+        Nothing ->
+            ( manager, Cmd.none )
 
 
-jsonRequest : (Decode.Value -> msg) -> ( String, Encode.Value ) -> Request
-jsonRequest =
-    Request Decode.value
-
-
-map : (a -> b) -> Request a -> Request b
-map ctor request =
-    { request | msgCtor = ctor << request.msgCtor }
-
-
-update : Request a msg -> Manager msg -> ( Manager msg, Cmd msg )
-update request manager =
-    let
-        threadKey =
-            manager.namespace ++ toString manager.threadCount
-    in
-    ( { manager
-        | threads =
-            Dict.set
-                threadKey
-                (Decode.map request.msgCtor request.decoder)
-                manager.threads
-        , threadCount = manager.threadCount + 1
-      }
-    , request.jsMsg
-        |> encode threadKey
-        |> manager.send
-    )
-
-
-encode : String -> ( String, Encode.Value ) -> Encode.Value
+encode : Int -> ( String, Encode.Value ) -> Encode.Value
 encode id ( type_, pmayload ) =
     [ ( "id", Encode.string id )
     , ( "type", Encode.string type_ )
@@ -96,9 +68,9 @@ encode id ( type_, pmayload ) =
         |> Encode.object
 
 
-idDecoder : Decoder String
+idDecoder : Decoder Int
 idDecoder =
-    Decode.field "id" Decode.string
+    Decode.field "id" Decode.int
 
 
 payload : Decoder a -> Decoder a
@@ -106,7 +78,7 @@ payload decoder =
     Decode.field "payload"
 
 
-decode : Manager msg -> Decode.Value -> ( Manager msg, msg )
+decode : Manager msg -> Decode.Value -> msg
 decode manager json =
     case decodeValue idDecoder json of
         Ok id ->
@@ -120,28 +92,16 @@ decode manager json =
                 Err _ ->
                     err
                         |> IdDecoderFailed
-                        |> manager.errCtoro
+                        |> manager.errCtor
 
 
-resolveThread : String -> Manager msg -> Decode.Value -> ( Manager msg, msg )
+resolveThread : String -> Manager msg -> Decode.Value -> msg
 resolveThread key manager json =
     case Dict.get key manager.threads of
-        Just decoder ->
-            case decodeValue (payload decoder) json of
-                Ok msg ->
-                    ( { manager
-                        | threads =
-                            Dict.remove key manager.threads
-                      }
-                    , msg
-                    )
-
-                Err err ->
-                    ( manager
-                    , err
-                        |> MsgDecoderFailed
-                        |> manager.errCtor
-                    )
+        Just { decoder, msgCtor } ->
+            json
+                |> decodeValue (payload decoder)
+                |> msgCtor
 
         Nothing ->
-            ( manager, manager.errCtor ThreadDoesNotExist )
+            manager.errCtor ThreadDoesNotExist
