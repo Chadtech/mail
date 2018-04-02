@@ -6,7 +6,7 @@ module Ports.Request
         )
 
 import Json.Decode exposing (Decoder)
-import Json.Encode as Encode
+import Json.Encode as Encode exposing (Value)
 
 
 type alias Request a msg =

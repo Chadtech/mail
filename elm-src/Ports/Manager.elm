@@ -11,8 +11,8 @@ module Ports.Manager
         )
 
 import Dict exposing (Dict)
-import Json.Decode exposing (Decoder, decodeValue)
-import Json.Encode as Encode
+import Json.Decode as Decode exposing (Decoder, decodeValue)
+import Json.Encode as Encode exposing (Value)
 
 
 -- TYPES --
@@ -21,7 +21,7 @@ import Json.Encode as Encode
 type alias Manager msg =
     { threads : Dict Int (Decoder msg)
     , threadCount : Int
-    , send : Encode.Value -> Cmd msg
+    , send : Value -> Cmd msg
     }
 
 
@@ -31,10 +31,16 @@ type Error
     | SubscriptionDoesNotExist
 
 
-init : (String -> msg) -> Manager msg
-init errCtor =
+type Msg msg
+    = AppMsg msg
+    | PortsMsg Decode.Value
+
+
+init : (String -> msg) -> (Value -> Cmd msg) -> Manager msg
+init errCtor send =
     { threads = Dict.empty
     , threadCount = 0
+    , send = send
     }
 
 
