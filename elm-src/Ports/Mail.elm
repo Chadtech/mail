@@ -185,7 +185,7 @@ handleLetter (Letter address payload maybeDecoder) model =
                 ( newModel, thread ) =
                     newThread model
             in
-            ( newModel
+            ( insertThread thread decoder newModel
             , Cmd.map AppMsg <| toCmd address (Just thread) payload model
             )
 
@@ -207,6 +207,11 @@ newThread model =
             ( { model | threadCount = model.threadCount + 1 }
             , model.threadCount
             )
+
+
+insertThread : Int -> Decoder msg -> Model model msg -> Model model msg
+insertThread thread decoder model =
+    { model | threads = Dict.insert thread decoder model.threads }
 
 
 toCmd : String -> Maybe Int -> Value -> Model model msg -> Cmd msg

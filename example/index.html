@@ -1,0 +1,52 @@
+<html>
+<head>
+  <style>
+    /* custom styles? Sure! */
+  </style>
+</head>
+<body>
+  <!-- Relative to index.html, main.elm lives in `src/Main.elm`. -->
+  <!-- Prefixing that with `/_compile/` gives us magic! -->
+  <script src="/_compile/src/Main.elm"></script>
+  <script>
+    function handleMsg(app, model, msg) {
+        var sub = model[msg.address];
+        if (typeof sub === "undefined") {
+            console.log("Sub doesnt exist");
+            return;
+        }
+        sub(msg.payload, function(response){
+            app.ports.fromJs.send({
+                thread: msg.thread,
+                payload: response
+            });
+        });
+    }
+
+    var PortsManager = function(app, model) {
+        app.ports.toJs.subscribe(function(msg) {
+            handleMsg(app, model, msg);
+        });
+    };
+
+    var app = Elm.Main.fullscreen();
+
+    function square(payload, reply) {
+        reply(payload * payload);
+    }
+
+    function login(payload, reply) {
+        if (payload.password === "password") {
+            reply(payload.username);
+        } else {
+            reply(null);
+        }
+    }
+
+    PortsManager(app, {
+        square: square,
+        login: login
+    });
+  </script>
+</body>
+</html>
