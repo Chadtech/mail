@@ -108,9 +108,14 @@ view : Model -> Html Msg
 view model =
     case model.page of
         Home subModel ->
-            subModel
-                |> Home.view
-                |> Html.map HomeMsg
+            case model.user of
+                Just user ->
+                    subModel
+                        |> Home.view user
+                        |> Html.map HomeMsg
+
+                Nothing ->
+                    errorView
 
         Login subModel ->
             subModel
@@ -118,7 +123,12 @@ view model =
                 |> Html.map LoginMsg
 
         Error ->
-            Html.text "Oh no something went wrong"
+            errorView
+
+
+errorView : Html Msg
+errorView =
+    Html.text "Oh no something went wrong"
 
 
 

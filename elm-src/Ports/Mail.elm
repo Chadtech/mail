@@ -221,7 +221,6 @@ toCmd address maybeThread payload model =
     , ( "payload", payload )
     ]
         |> Encode.object
-        |> Debug.log "Here"
         |> model.toJs
 
 
@@ -257,12 +256,8 @@ expectResponse decoder ctor (Letter funcName json _) =
 toMsgDecoder : Decoder a -> (Result String a -> msg) -> Decoder msg
 toMsgDecoder decoder ctor =
     Decode.value
-        |> Decode.andThen (decodingDecoder decoder ctor)
-
-
-decodingDecoder : Decoder a -> (Result String a -> msg) -> Decode.Value -> Decoder msg
-decodingDecoder decoder ctor =
-    Decode.succeed << ctor << Decode.decodeValue decoder
+        |> Decode.andThen
+            (Decode.succeed << ctor << Decode.decodeValue decoder)
 
 
 send : Letter msg -> Mail msg

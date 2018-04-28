@@ -8,7 +8,7 @@ module Login
         , view
         )
 
-import Html exposing (Html, button, div, input, p)
+import Html exposing (Html, br, button, div, input, p)
 import Html.Attributes exposing (type_, value)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode
@@ -22,6 +22,7 @@ import Ports.Mail as Mail exposing (Mail)
 type alias Model =
     { username : String
     , password : String
+    , wrongPassword : Bool
     }
 
 
@@ -49,6 +50,7 @@ init : Model
 init =
     { username = ""
     , password = ""
+    , wrongPassword = False
     }
 
 
@@ -83,8 +85,8 @@ update msg model =
             , SetUser username
             )
 
-        LoginFinished (Err err) ->
-            ( model
+        LoginFinished (Err _) ->
+            ( { model | wrongPassword = True }
             , Mail.none
             , NoReply
             )
@@ -132,7 +134,18 @@ view model =
             , type_ "password"
             ]
             []
+        , wrongPasswordView model
         , button
             [ onClick SubmitClicked ]
             [ Html.text "Submit" ]
         ]
+
+
+wrongPasswordView : Model -> Html Msg
+wrongPasswordView model =
+    if model.wrongPassword then
+        p
+            []
+            [ Html.text "You entered the wrong password!" ]
+    else
+        br [] []

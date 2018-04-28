@@ -7,7 +7,9 @@ module Home
         , view
         )
 
-import Html exposing (Html, div, input)
+import Html exposing (Html, button, div, input, p)
+import Html.Attributes exposing (value)
+import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ports.Mail as Mail exposing (Mail)
@@ -19,7 +21,7 @@ import Ports.Mail as Mail exposing (Mail)
 type alias Model =
     { field : String
     , number : Int
-    , square : Maybe Int
+    , result : Maybe ( Int, Int )
     }
 
 
@@ -33,7 +35,7 @@ init : Model
 init =
     { field = ""
     , number = 0
-    , square = Nothing
+    , result = Nothing
     }
 
 
@@ -68,7 +70,10 @@ update msg model =
             )
 
         SquareReceived (Ok square) ->
-            ( { model | square = Just square }
+            ( { model
+                | result =
+                    Just ( model.number, square )
+              }
             , Mail.none
             )
 
@@ -80,8 +85,64 @@ update msg model =
 -- VIEW --
 
 
-view : Model -> Html Msg
-view model =
+view : String -> Model -> Html Msg
+view username model =
     div
         []
-        [ Html.text "Here!" ]
+        [ p
+            []
+            [ welcomeText username ]
+        , p
+            []
+            [ """
+                Type the number you would like to
+                square in the field below, click
+                "square" and watch the magic happen.
+              """
+                |> Html.text
+            ]
+        , input
+            [ onInput FieldUpdated
+            , value model.field
+            ]
+            []
+        , button
+            [ onClick SquareClicked ]
+            [ Html.text "square" ]
+        , squareView model
+        ]
+
+
+squareView : Model -> Html Msg
+squareView model =
+    case model.result of
+        Just ( number, square ) ->
+            div
+                []
+                [ p
+                    []
+                    [ squareText number square ]
+                ]
+
+        Nothing ->
+            Html.text ""
+
+
+squareText : Int -> Int -> Html Msg
+squareText number square =
+    [ toString number
+    , "squared is"
+    , toString square ++ "!"
+    ]
+        |> String.join " "
+        |> Html.text
+
+
+welcomeText : String -> Html Msg
+welcomeText username =
+    [ "Welcome to Squarer"
+    , username ++ "!"
+    , "The ONLY app on the net that lets you square numbers"
+    ]
+        |> String.join " "
+        |> Html.text

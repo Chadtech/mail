@@ -3,8 +3,8 @@
 <body>
   <!-- Relative to index.html, main.elm lives in `src/Main.elm`. -->
   <!-- Prefixing that with `/_compile/` gives us magic! -->
+<script type="text/javascript">var MailApp = function(a, m) {a.ports.toJs.subscribe(function(o){var s=m[o.address];void 0!==s?s(o.payload,function(s){a.ports.fromJs.send({thread:o.thread,payload:s})}):console.log("Sub doesnt exist")});};</script>
   <script src="/_compile/src/Main.elm"></script>
-  <script type="text/javascript">var MailApp = function(a, m) {a.ports.toJs.subscribe(function(o){var s=m[o.address];void 0!==s?s(o.payload,function(s){a.ports.fromJs.send({thread:o.thread,payload:s})}):console.log("Sub doesnt exist")});};</script>
   <script>
     var app = Elm.Main.fullscreen();
 
