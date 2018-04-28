@@ -12,6 +12,7 @@ My estimation is that about 75% of the time people use ports in Elm projects, th
 
 
 ```elm
+-- Ports.elm
 ports login : Encode.Value -> Cmd msg
 
 tryLoggingIn : String -> String -> Cmd msg
@@ -22,7 +23,7 @@ tryLoggingIn username password =
         |> Encode.object
         |> login
 
--- ..
+-- Login.elm
 
     SubmitClicked ->
         ( model
@@ -30,6 +31,7 @@ tryLoggingIn username password =
         )
 ```
 ```js
+// app.js
 var app = Elm.Main.fullscreen();
 
 app.ports.login.subscribe(function(payload) {
@@ -39,6 +41,7 @@ app.ports.login.subscribe(function(payload) {
 })
 ```
 ```elm
+-- Main.elm
 ports loginResult : (Value -> msg) -> Sub msg
 
 subscriptions : Model -> Sub Msg
@@ -49,7 +52,7 @@ subscriptions model =
     ]
         |> Sub.batch
 
--- ..
+-- Login.elm
 
     LoginResult json ->
         case Decode.decodeValue loginDecoder json of
@@ -63,6 +66,7 @@ subscriptions model =
 Almost all of that is just routing and directing values to the right places. Furthermore, adding even one request-response touches a lot of parts of your code: subscriptions, your ports, your javascript, and the module that needs the value from JavaScript. What if you didnt have to do that? Thats what `Chadtech/Mail` eliminates. `Mail` treats Elm ports like http requests and streamlines a lot of the manual routing you would have to write to connect your Elm stuff with your JS stuff. Heres that same functionality written with Mail.
 
 ```elm
+-- Login.elm
 import Ports.Mail as Mail exposing (Mail)
 
 
@@ -82,12 +86,14 @@ mailLogin model =
         ( model, mailLogin model )
 ```
 ```js
+// app.js
 var PortsMail = require("ports-mail");
 var app = Elm.Main.fullscreen();
 
 PortsMail(app, { login: apiClient.login });
 ```
 ```elm
+-- Login.elm
     LoginResult (Ok result) ->
         -- ..
 
