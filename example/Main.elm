@@ -1,22 +1,25 @@
 port module Main exposing (..)
 
 import Home
-import Html exposing (Program)
+import Html exposing (Html)
+import Json.Encode exposing (Value)
 import Login
-import Ports.Manager exposing (Manager)
+import Ports.Mail as Mail exposing (Mail)
 
 
 -- MAIN --
 
 
-main : Program Never Model Msg
+main : Mail.Program Never Model Msg
 main =
     { init = init
     , update = update
     , view = view
-    , subscriptions = subscriptions
+    , subscriptions = always Sub.none
+    , toJs = toJs
+    , fromJs = fromJs
     }
-        |> Html.program
+        |> Mail.program
 
 
 
@@ -26,14 +29,12 @@ main =
 type alias Model =
     { page : Page
     , user : Maybe String
-    , portsManager : Manager Msg
     }
 
 
 type Msg
     = LoginMsg Login.Msg
     | HomeMsg Home.Msg
-    | PortsManagerError String
 
 
 type Page
@@ -42,18 +43,12 @@ type Page
     | Error
 
 
-
--- INIT --
-
-
-init : ( Model, Cmd Msg )
+init : ( Model, Mail Msg )
 init =
-    ( { page = Login.init
+    ( { page = Login Login.init
       , user = Nothing
-      , portsManager =
-            Ports.Manager.init "Main" PortsManagerError
       }
-    , Cmd.none
+    , Mail.none
     )
 
 
@@ -61,24 +56,32 @@ init =
 -- UPDATE --
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> ( Model, Mail Msg )
 update msg model =
     case msg of
         LoginMsg subMsg ->
             case model.page of
                 Login subModel ->
                     let
-                        ( newSubModel, cmd, reply ) =
+                        ( newSubModel, mail, reply ) =
                             Login.update subMsg subModel
                     in
                     case reply of
-                        NoReply ->
-                            newSubModel
-                                |> Tuple.mapFirst (setPage model Login)
-                                |> Tuple.mapSecond (Cmd.map LoginMsg)
+                        Login.NoReply ->
+                            ( setPage model Login newSubModel
+                            , Mail.map LoginMsg mail
+                            )
+
+                        Login.SetUser username ->
+                            ( { model
+                                | user = Just username
+                                , page = Home Home.init
+                              }
+                            , Mail.map LoginMsg mail
+                            )
 
                 _ ->
-                    ( model, Cmd.none )
+                    ( model, Mail.none )
 
         HomeMsg subMsg ->
             case model.page of
@@ -86,15 +89,15 @@ update msg model =
                     subModel
                         |> Home.update subMsg
                         |> Tuple.mapFirst (setPage model Home)
-                        |> Tuple.mapSecond (Cmd.map LoginMsg)
+                        |> Tuple.mapSecond (Mail.map HomeMsg)
 
                 _ ->
-                    ( model, Cmd.none )
+                    ( model, Mail.none )
 
 
-setPage : Model -> (subModel -> Page) -> ( subModel, Cmd msg ) -> ( Model, Cmd msg )
-setPage model pageCtor ( subModel, cmd ) =
-    ( { model | page = pageCtor subModel }, cmd )
+setPage : Model -> (subModel -> Page) -> subModel -> Model
+setPage model pageCtor subModel =
+    { model | page = pageCtor subModel }
 
 
 
@@ -114,21 +117,15 @@ view model =
                 |> Login.view
                 |> Html.map LoginMsg
 
-
-
--- SUBSCRIPTIONS --
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    fromJs (Ports.Manager.decode model.portsManager)
+        Error ->
+            Html.text "Oh no something went wrong"
 
 
 
 -- PORTS --
 
 
-port fromJs : (Value -> Msg) -> Sub Msg
+port fromJs : (Value -> msg) -> Sub msg
 
 
 port toJs : Value -> Cmd msg

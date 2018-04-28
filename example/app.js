@@ -7,6 +7,7 @@ function square(payload, reply) {
 }
 
 function login(payload, reply) {
+    console.log("WHAT?", payload);
     if (payload.password === "password") {
         reply(payload.username);
     } else {

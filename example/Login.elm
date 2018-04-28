@@ -2,10 +2,19 @@ module Login
     exposing
         ( Model
         , Msg
+        , Reply(..)
         , init
         , update
         , view
         )
+
+import Html exposing (Html, button, div, input, p)
+import Html.Attributes exposing (type_, value)
+import Html.Events exposing (onClick, onInput)
+import Json.Decode as Decode
+import Json.Encode as Encode
+import Ports.Mail as Mail exposing (Mail)
+
 
 -- TYPES --
 
@@ -27,6 +36,11 @@ type Field
     | Password
 
 
+type Reply
+    = NoReply
+    | SetUser String
+
+
 
 -- INIT --
 
@@ -42,41 +56,83 @@ init =
 -- UPDATE --
 
 
-update : Msg -> Model -> ( Model, Maybe (Request a Msg), Reply )
+update : Msg -> Model -> ( Model, Mail Msg, Reply )
 update msg model =
     case msg of
         FieldUpdated Username str ->
             ( { model | username = str }
-            , Nothing
+            , Mail.none
             , NoReply
             )
 
         FieldUpdated Password str ->
             ( { model | password = str }
-            , Nothing
+            , Mail.none
             , NoReply
             )
 
         SubmitClicked ->
             ( model
-            , Just <| submitRequest model
+            , mailLogin model
+            , NoReply
+            )
+
+        LoginFinished (Ok username) ->
+            ( model
+            , Mail.none
+            , SetUser username
+            )
+
+        LoginFinished (Err err) ->
+            ( model
+            , Mail.none
             , NoReply
             )
 
 
-submitRequest : Model -> Request String Msg
-submitRequest model =
-    Ports.Manager.request
-        Decode.string
-        LoginFinished
-        (loginMsg model)
+mailLogin : Model -> Mail Msg
+mailLogin model =
+    model
+        |> loginPayload
+        |> Mail.letter "login"
+        |> Mail.expectResponse Decode.string LoginFinished
+        |> Mail.send
 
 
-loginMsg : Model -> ( String, Encode.Value )
-loginMsg model =
-    ( "login"
-    , [ ( "username", Encode.string model.username )
-      , ( "password", Encode.string model.password )
-      ]
+loginPayload : Model -> Encode.Value
+loginPayload model =
+    [ ( "username", Encode.string model.username )
+    , ( "password", Encode.string model.password )
+    ]
         |> Encode.object
-    )
+
+
+
+-- VIEW --
+
+
+view : Model -> Html Msg
+view model =
+    div
+        []
+        [ p
+            []
+            [ Html.text "username" ]
+        , input
+            [ value model.username
+            , onInput (FieldUpdated Username)
+            ]
+            []
+        , p
+            []
+            [ Html.text "password (hint: its \"password\")" ]
+        , input
+            [ value model.password
+            , onInput (FieldUpdated Password)
+            , type_ "password"
+            ]
+            []
+        , button
+            [ onClick SubmitClicked ]
+            [ Html.text "Submit" ]
+        ]
