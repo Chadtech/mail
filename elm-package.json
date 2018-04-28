@@ -1,12 +1,12 @@
 {
     "version": "1.0.0",
     "summary": "A request / response model for ports",
-    "repository": "https://github.com/Chadtech/ports-manager.git",
+    "repository": "https://github.com/Chadtech/mail.git",
     "license": "BSD3",
     "source-directories": [
         "./elm-src"
     ],
-    "exposed-modules": [ "Ports.Manager" ],
+    "exposed-modules": [ "Ports.Mail" ],
     "dependencies": {
         "elm-lang/core": "5.1.1 <= v < 6.0.0",
         "elm-lang/html": "2.0.0 <= v < 3.0.0"

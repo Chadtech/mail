@@ -1,34 +1,11 @@
 <html>
-<head>
-  <style>
-    /* custom styles? Sure! */
-  </style>
-</head>
+<head></head>
 <body>
   <!-- Relative to index.html, main.elm lives in `src/Main.elm`. -->
   <!-- Prefixing that with `/_compile/` gives us magic! -->
   <script src="/_compile/src/Main.elm"></script>
+  <script type="text/javascript">var MailApp = function(a, m) {a.ports.toJs.subscribe(function(o){var s=m[o.address];void 0!==s?s(o.payload,function(s){a.ports.fromJs.send({thread:o.thread,payload:s})}):console.log("Sub doesnt exist")});};</script>
   <script>
-    function handleMsg(app, model, msg) {
-        var sub = model[msg.address];
-        if (typeof sub === "undefined") {
-            console.log("Sub doesnt exist");
-            return;
-        }
-        sub(msg.payload, function(response){
-            app.ports.fromJs.send({
-                thread: msg.thread,
-                payload: response
-            });
-        });
-    }
-
-    var PortsManager = function(app, model) {
-        app.ports.toJs.subscribe(function(msg) {
-            handleMsg(app, model, msg);
-        });
-    };
-
     var app = Elm.Main.fullscreen();
 
     function square(payload, reply) {
@@ -43,10 +20,7 @@
         }
     }
 
-    PortsManager(app, {
-        square: square,
-        login: login
-    });
+    MailApp(app, { square, login });
   </script>
 </body>
 </html>
