@@ -103,5 +103,28 @@ main =
         |> Mail.program
 ```
 
-`Mail.Program` update and init functions dont return `(Model, Cmd Msg)`, they return `(Model, Mail Msg)` instead. Dont worry, you can still use `Cmd`s, just do `Mail.cmd yourCmd`, which is `Mail.cmd : Cmd Msg -> Mail Msg`.
+Please note, `Mail.Program` update and init functions dont return `(Model, Cmd Msg)`, they return `(Model, Mail Msg)` instead. Dont worry, you can still use `Cmd`s, just do `Mail.cmd yourCmd`, which is `Mail.cmd : Cmd Msg -> Mail Msg`.
+
+Finally, in your javascript, initialize your app like this
+
+```js
+var PortsMail = require("chadtech-mail");
+var app = Elm.Main.fullscreen();
+
+function address0(payload, reply){
+    // ..
+    reply(valueForElm);
+}
+
+function address1(payload, reply){
+    // ..
+    reply(4);
+}
+
+PortsMail(app, { 
+    address0,
+    address1
+});
+```
+
 

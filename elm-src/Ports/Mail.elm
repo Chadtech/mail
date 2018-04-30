@@ -20,6 +20,22 @@ import Platform
 import Platform.Cmd
 
 
+{-| A different way of using ports in Elm, as a request and response similar to http request. Please look at the readme and github example for a full explanation of this package.
+
+
+# Mail
+
+@docs Mail, Letter, letter, expectResponse, send, map, cmd, none
+
+
+# Program
+
+@docs Program, program
+
+-}
+
+
+
 -- TYPES --
 
 
@@ -29,15 +45,39 @@ type alias Program json model msg =
     Platform.Program json (Model model msg) (Msg msg)
 
 
-{-| Mail is stuff thats sent out of the Elm run time. Regular Elm `Cmd`s are wrapped up as a `Mail`, along with `Letter`s.
+{-| `Mail` is stuff thats sent out of the Elm run time. Regular Elm `Cmd`s are wrapped up as a `Mail`, along with `Letter`s. `Mail` is sent out from update functions as `(Model, Mail Msg)`, just like `Cmd`s are in a normal Elm application.
+
+    update : Msg -> Model -> ( Model, Mail Msg )
+    update msg model =
+        case msg of
+            ShutDownClicked ->
+                ( model, attemptShutDown )
+
+            ShutDownGranted True ->
+                ( model, shutDown )
+
+            ShutDownGranted False ->
+                ( model, Mail.none )
+
+    attemptShutDown : Mail Msg
+    attemptShutDown =
+        Encode.null
+            |> Mail.etter "attemptShutDown"
+            |> Mail.ExpectResponse Decode.bool ShutDownGranted
+            |> Mail.send
+
 -}
 type Mail msg
     = Letter_ (Letter msg)
     | Cmd (Cmd msg)
-    | None
 
 
-{-| Letters are things that go through ports int the JS side of your application. They can either be made to expect an explicit response, or be made to just "send and forget"
+{-| Letters are things that go through ports into the JS side of your application. They can either be made to expect an explicit response, or be made to just "send and forget" without receiving a response.
+
+    Mail.letter "receiveName" (Encode.sting "Ludwig")
+    -- The address "receiveName" in JS will receive
+    -- the value "Ludwig"
+
 -}
 type Letter msg
     = Letter String Encode.Value (Maybe (Decoder msg))
@@ -185,9 +225,6 @@ handleMail ( model, mail ) =
         Cmd cmd ->
             ( model, Cmd.map AppMsg cmd )
 
-        None ->
-            ( model, Cmd.none )
-
 
 handleLetter : Letter msg -> Model model msg -> ( Model model msg, Cmd (Msg msg) )
 handleLetter (Letter address payload maybeDecoder) model =
@@ -250,6 +287,15 @@ encodeMaybe maybe encoder =
 -- MAIL FUNCTIONS --
 
 
+{-| You can still use `Cmd`s in a `Mail.Program`, you just have to wrap it using `Mail.cmd`
+
+    Random.generate NewFace (Random.int 1 6)
+        |> Mail.cmd
+    -- : Mail Msg
+
+    Mail.none == Mail.cmd Cmd.none
+
+-}
 cmd : Cmd msg -> Mail msg
 cmd =
     Cmd
@@ -297,17 +343,18 @@ send =
     Letter_
 
 
-{-| No mail, just like..
+{-| No `Mail` to send, just like..
 
-    Cmd.none
+    Cmd.none : Cmd msg
+    Mail.none : Mail msg
 
 -}
 none : Mail msg
 none =
-    None
+    cmd Cmd.none
 
 
-{-| Map your mail from one type to another
+{-| Map your `Mail` from one type to another
 
     Mail.map LoginMsg loginMail
 
@@ -332,6 +379,3 @@ map ctor mail =
 
         Cmd cmd ->
             Cmd (Cmd.map ctor cmd)
-
-        None ->
-            None
