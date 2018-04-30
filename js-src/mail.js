@@ -1,15 +1,21 @@
 module.exports = function(app, model) {
     app.ports.toJs.subscribe(function(msg) {
         var sub = model[msg.address];
-        if (typeof sub === "undefined") {
-            console.log("Sub doesnt exist");
-            return;
+        switch (typeof sub) {
+            case "undefined":
+                console.log("Address " + msg.address + " doesnt exist");
+                return;
+            case "function":
+                sub(msg.payload, function(response){
+                    app.ports.fromJs.send({
+                        thread: msg.thread,
+                        payload: response
+                    });
+                });
+                break;
+
+            default:
+                console.log("Address " + msg.address + " is not a function.");
         }
-        sub(msg.payload, function(response){
-            app.ports.fromJs.send({
-                thread: msg.thread,
-                payload: response
-            });
-        });
     });
 };

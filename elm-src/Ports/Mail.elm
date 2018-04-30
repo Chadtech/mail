@@ -2,7 +2,6 @@ module Ports.Mail
     exposing
         ( Letter
         , Mail
-        , Msg
         , Program
         , cmd
         , expectResponse
@@ -24,16 +23,22 @@ import Platform.Cmd
 -- TYPES --
 
 
+{-| Identical to the type `Platform.Program`
+-}
 type alias Program json model msg =
     Platform.Program json (Model model msg) (Msg msg)
 
 
+{-| Mail is stuff thats sent out of the Elm run time. Regular Elm `Cmd`s are wrapped up as a `Mail`, along with `Letter`s.
+-}
 type Mail msg
     = Letter_ (Letter msg)
     | Cmd (Cmd msg)
     | None
 
 
+{-| Letters are things that go through ports int the JS side of your application. They can either be made to expect an explicit response, or be made to just "send and forget"
+-}
 type Letter msg
     = Letter String Encode.Value (Maybe (Decoder msg))
 
@@ -54,6 +59,13 @@ type Msg msg
     | PortsMsg Decode.Value
 
 
+{-| The same as `Html.program` with two exceptions. First the model takes toJs and fromJs ports. Second, the init and update functions return `(model, Mail msg)` instead of `(model, Cmd msg)`. You can still issue `Cmd msg`s, just through the `Mail.cmd` function. The toJs and fromJs ports _must_ have the following names and type signatures.
+
+    port fromJs : (Json.Encode.Value -> msg) -> Sub msg
+
+    port toJs : Json.Encode.Value -> Cmd msg
+
+-}
 program :
     { init : ( model, Mail msg )
     , update : msg -> model -> ( model, Mail msg )
@@ -243,11 +255,29 @@ cmd =
     Cmd
 
 
+{-| Construct a letter. The `String` parameter is the "address" your `Encode.Value` will reach. The address is defined as the key in the javascript object given to `PortsMail` in your javascript. In the following case its `"getRandomNumber"`
+
+    -- In Elm
+    Mail.letter "getRandomNumber" (Encode.int 12)
+
+    -- In JavaScript
+    PortsMail(app, {
+        getRandomNumber: function(payload, reply) {
+            reply(Math.floor(payload * Math.random()));
+        }
+    });
+
+-}
 letter : String -> Encode.Value -> Letter msg
 letter funcName payload =
     Letter funcName payload Nothing
 
 
+{-| Many ports are sent out with the expectation of a response. To define what exactly your outgoing message expects in return, use this function. It takes a `Decoder a` of the value it expects in the incoming Json, a `Msg` constructor that can handle the result of decoding the value, and an existing letter.
+
+    Mail.expectResponse Decode.int RandomNumberFetched
+
+-}
 expectResponse : Decoder a -> (Result String a -> msg) -> Letter msg -> Letter msg
 expectResponse decoder ctor (Letter funcName json _) =
     Letter funcName json (Just <| toMsgDecoder decoder ctor)
@@ -260,16 +290,33 @@ toMsgDecoder decoder ctor =
             (Decode.succeed << ctor << Decode.decodeValue decoder)
 
 
+{-| This function packs a `Letter` up into a `Mail`.
+-}
 send : Letter msg -> Mail msg
 send =
     Letter_
 
 
+{-| No mail, just like..
+
+    Cmd.none
+
+-}
 none : Mail msg
 none =
     None
 
 
+{-| Map your mail from one type to another
+
+    Mail.map LoginMsg loginMail
+
+..much like..
+
+    Cmd.map LoginMsg loginCmd
+    Html.map LoginMsg Login.view
+
+-}
 map : (a -> b) -> Mail a -> Mail b
 map ctor mail =
     case mail of
