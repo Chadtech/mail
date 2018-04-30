@@ -61,3 +61,47 @@ PortsMail(app, {
     }
 });
 ```
+
+# Getting Started
+
+Please study the code in the example folder so you know what you are in for. To install everything, type..
+
+```
+elm package install Chadtech/mail --yes
+npm install chadtech-mail --save
+```
+
+Then, in your main Elm file, copy and paste in these ports..
+
+```elm
+port fromJs : (Value -> msg) -> Sub msg
+
+
+port toJs : Value -> Cmd msg
+```
+
+..make sure your main module is a ports module..
+
+```elm
+port module Main exposing (..)
+```
+
+..And finally import and initialize a `Mail.program`..
+
+```elm
+import Ports.Mail as Mail exposing (Mail)
+
+main : Mail.Program Never Model Msg
+main =
+    { init = init
+    , update = update
+    , view = view
+    , subscriptions = always Sub.none
+    , toJs = toJs
+    , fromJs = fromJs
+    }
+        |> Mail.program
+```
+
+`Mail.Program` update and init functions dont return `(Model, Cmd Msg)`, they return `(Model, Mail Msg)` instead. Dont worry, you can still use `Cmd`s, just do `Mail.cmd yourCmd`, which is `Mail.cmd : Cmd Msg -> Mail Msg`.
+
