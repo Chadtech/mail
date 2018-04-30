@@ -1,0 +1,23 @@
+{
+  "name": "chadtech-mail",
+  "version": "1.0.0",
+  "description": "Elm ports modelled in a request-response format",
+  "main": "js-src/mail.js",
+  "directories": {
+    "example": "example"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://www.github.com/Chadtech/mail.git"
+  },
+  "keywords": [
+    "elm",
+    "ports",
+    "mail"
+  ],
+  "author": "Chadtech",
+  "license": "ISC"
+}
