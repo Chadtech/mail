@@ -12,14 +12,6 @@ module Ports.Mail
         , send
         )
 
-import Dict exposing (Dict)
-import Html exposing (Html)
-import Json.Decode as Decode exposing (Decoder)
-import Json.Encode as Encode exposing (Value)
-import Platform
-import Platform.Cmd
-
-
 {-| A different way of using ports in Elm, as a request and response similar to http request. Please look at the readme and github example for a full explanation of this package.
 
 
@@ -34,6 +26,12 @@ import Platform.Cmd
 
 -}
 
+import Dict exposing (Dict)
+import Html exposing (Html)
+import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode exposing (Value)
+import Platform
+import Platform.Cmd
 
 
 -- TYPES --
