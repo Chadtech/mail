@@ -43,7 +43,9 @@ type alias Program json model msg =
     Platform.Program json (Model model msg) (Msg msg)
 
 
-{-| `Mail` is stuff thats sent out of the Elm run time. Regular Elm `Cmd`s are wrapped up as a `Mail`, along with `Letter`s. `Mail` is sent out from update functions as `(Model, Mail Msg)`, just like `Cmd`s are in a normal Elm application.
+{-| `Mail` is stuff thats sent out of the Elm run time. `Mail` is sent out from update functions as `(Model, Mail Msg)`, just like `Cmd`s are in a normal Elm application. Regular Elm `Cmd`s can be wrapped up as a `Mail`, along with `Letter`s.
+
+    import Ports.Mail as Mail exposing (Mail)
 
     update : Msg -> Model -> ( Model, Mail Msg )
     update msg model =
@@ -51,17 +53,17 @@ type alias Program json model msg =
             ShutDownClicked ->
                 ( model, attemptShutDown )
 
-            ShutDownGranted True ->
+            ShutDownGranted (Ok True) ->
                 ( model, shutDown )
 
-            ShutDownGranted False ->
+            ShutDownGranted _ ->
                 ( model, Mail.none )
 
     attemptShutDown : Mail Msg
     attemptShutDown =
         Encode.null
-            |> Mail.etter "attemptShutDown"
-            |> Mail.ExpectResponse Decode.bool ShutDownGranted
+            |> Mail.letter "attemptShutDown"
+            |> Mail.expectResponse Decode.bool ShutDownGranted
             |> Mail.send
 
 -}
@@ -70,9 +72,9 @@ type Mail msg
     | Cmd (Cmd msg)
 
 
-{-| Letters are things that go through ports into the JS side of your application. They can either be made to expect an explicit response, or be made to just "send and forget" without receiving a response.
+{-| `Letter`s are things that go through ports into the JS side of your application. They can either be made to expect an explicit response, or be made to just "send and forget" without receiving a response.
 
-    Mail.letter "receiveName" (Encode.sting "Ludwig")
+    Mail.letter "receiveName" (Encode.string "Ludwig")
     -- The address "receiveName" in JS will receive
     -- the value "Ludwig"
 
@@ -98,6 +100,20 @@ type Msg msg
 
 
 {-| The same as `Html.program` with two exceptions. First the model takes toJs and fromJs ports. Second, the init and update functions return `(model, Mail msg)` instead of `(model, Cmd msg)`. You can still issue `Cmd msg`s, just through the `Mail.cmd` function. The toJs and fromJs ports _must_ have the following names and type signatures.
+
+    import Json.Encode
+    import Ports.Mail as Mail exposing (Mail)
+
+    main : Mail.Program Never Model Msg
+    main =
+        { init = init
+        , update = update
+        , view = view
+        , subscriptions = always Sub.none
+        , toJs = toJs
+        , fromJs = fromJs
+        }
+            |> Mail.program
 
     port fromJs : (Json.Encode.Value -> msg) -> Sub msg
 
