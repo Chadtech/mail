@@ -8,52 +8,16 @@ Heres a common story: you are working on an Elm project, but you really need som
 The answer to all these problems is ports. Your Elm app should send a message out to the JS-side of things through a port, telling the JavaScript to do such-and-such behavior, 
 whereafter the JavaScript sends the resulting value back into Elm through another port.
 
-My estimation is that about 75% of the time people use ports in Elm projects, they are doing so in a request-response kind of way: they are requesting a value, and they are waiting for a value in response. The problem is Elm ports arent really built in a request-response kind of way. Outgoing and incoming ports are completely de-coupled without any assumption of a value coming back. Since Elm developers often need response values, they are often deliberately coupling outgoing and incoming ports manually. Here is kind of what that looks like..
+My estimation is that about 75% of the time people use ports in Elm projects, they are doing so in a request-response kind of way: they are requesting a value, and they are waiting for a value in response. The problem is Elm ports arent really built in a request-response kind of way. Outgoing and incoming ports are completely de-coupled without any assumption of a value coming back. Since Elm developers often need response values, they are often deliberately coupling outgoing and incoming ports manually. Here is a step by step of what code you would have to write to build a complete circuit from Elm to JS and back:
 
+1. Build an outgoing port for your request that routes your outgoing value to the right JavaScript function
+2. Write the code that builds a payload and passes it through that outgoing port
+3. Listen for the outgoing port on the JS side of your app, consume the payload, and return the value
+4. Build the incoimng port that routes your incoming value to the right place
 
-```elm
--- Ports.elm
-ports login : Encode.Value -> Cmd msg
+To add a single port you are necessarily touching four parts of your code base, merely to add really tedious lines of code like `"incomingMsg" -> IncomingMsg`. This doesnt scale very well.
 
-tryLoggingIn : String -> String -> Cmd msg
-tryLoggingIn username password =
-    [ ("username", Encode.string username)
-    , ("password", Encode.string password)
-    ]
-        |> Encode.object
-        |> login
-
--- Login.elm
-
-    SubmitClicked ->
-        ( model
-        , Ports.tryLoggingIn model.username model.password
-        )
-```
-```js
-// app.js
-var app = Elm.Main.fullscreen();
-
-app.ports.login.subscribe(function(payload) {
-    apiClient.login(payload, function(result) {
-        app.ports.loginResult.send(result);
-    })
-})
-```
-```elm
--- Main.elm
-ports loginResult : (Value -> msg) -> Sub msg
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    [ loginResult Login.LoginResult
-        |> Sub.map LoginMsg
-    -- ..
-    ]
-        |> Sub.batch
-```
-
-A lot of that is just routing and directing values to the right places. Furthermore, adding even one request-response touches a lot of parts of your code: subscriptions, your ports, your javascript, and the module that needs the value from JavaScript. `Chadtech/Mail` streamlines this tedious work. `Mail` treats Elm ports like http requests and handles all the routing you would have to write to connect your Elm stuff with your JS stuff. Heres that same functionality written with Mail.
+`Chadtech/mail` eliminates steps 1 and 4 in that process. `Mail` treats Elm ports like http requests and handles all the routing internally. Heres how the code in practice looks
 
 ```elm
 -- Login.elm
@@ -83,10 +47,14 @@ var app = Elm.Main.fullscreen();
 PortsMail(app, { login: apiClient.login });
 ```
 
-In Mail, you dont really have to routing anything, and all the business logic is compressed into the point from which you make the request. In the following snippet, the code is saying "Send this json to the addess 'login', and expect the response to look like this `Decoder a`, and route it to this `Msg`".
-```elm
-    json
-        |> Mail.letter "login"
-        |> Mail.expectResponse loginDecoder LoginResult
+In the code above `Mail.letter "login" json` says mail this json to the address `"login"`. `Mail.expectResponse` says we expect json in reply in the shape of `loginDecoder`, and we want it routed to come in via the `Msg` `LoginResult`. The entire specification of what is going on is handled in these few lines of code. 
+
+On the JavaScript side of things `PortsMail` initializes the elm app. The address is really just the key in a javascript object. The value of that key is a function, whos first argument is the payload from Elm, and whos second argument is the call back to send the value back into Elm. Something like..
+
+```js
+PortsMail(app, { 
+    getCurrentTime: function(payload, reply){
+        reply(new Date().getTime());
+    }
+});
 ```
-And so long as that address (`"login"`) exists on the JS side of things, and the Javascript invokes the callback provided by `PortsMail`, things will work. You dont need to add a subscription, or build another outgoing port, and all the relevant code for sending an out going message and getting a response can be packaged into one snippet of code in one module.
