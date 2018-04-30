@@ -38,6 +38,9 @@ mailLogin model =
 
     SubmitClicked ->
         ( model, mailLogin model )
+
+    LoginResult (Ok login) ->
+        -- ..
 ```
 ```js
 // app.js
@@ -47,7 +50,7 @@ var app = Elm.Main.fullscreen();
 PortsMail(app, { login: apiClient.login });
 ```
 
-In the code above `Mail.letter "login" json` says mail this json to the address `"login"`. `Mail.expectResponse` says we expect json in reply in the shape of `loginDecoder`, and we want it routed to come in via the `Msg` `LoginResult`. The entire specification of what is going on is handled in these few lines of code. 
+In the code above `Mail.letter "login" json` says mail this json to the address `"login"`. `Mail.expectResponse` says we expect json in reply in the shape of `loginDecoder`, and we want it routed to come in via the `Msg` `LoginResult`. The entire specification of what is going on is handled in these few lines of code with no ports or subscriptions.
 
 On the JavaScript side of things `PortsMail` initializes the elm app. The address is really just the key in a javascript object. The value of that key is a function, whos first argument is the payload from Elm, and whos second argument is the call back to send the value back into Elm. Something like..
 
