@@ -72,6 +72,11 @@ type alias Program json model msg =
 
 -}
 type Mail msg
+    = Single (SingleMail msg)
+    | Batched (List (SingleMail msg))
+
+
+type SingleMail msg
     = Letter_ (Letter msg)
     | Cmd (Cmd msg)
 
@@ -322,8 +327,36 @@ insertAppModel model appModel =
     { model | appModel = appModel }
 
 
+convertBatchedMailsToCmdList : ( Model model msg, List (SingleMail msg) ) -> ( Model model msg, List (Cmd (Msg msg)) )
+convertBatchedMailsToCmdList ( model, mails ) =
+    List.foldr
+        (\mail ( modelToUpdate, cmdList ) ->
+            let
+                ( updatedModel, newCmd ) =
+                    handleSingleMail ( modelToUpdate, mail )
+            in
+                ( updatedModel, cmdList ++ [ newCmd ] )
+        )
+        ( model, [] )
+        mails
+
+
 handleMail : ( Model model msg, Mail msg ) -> ( Model model msg, Cmd (Msg msg) )
 handleMail ( model, mail ) =
+    case mail of
+        Batched mails ->
+            let
+                ( newModel, cmdList ) =
+                    convertBatchedMailsToCmdList ( model, mails )
+            in
+                ( newModel, Platform.Cmd.batch cmdList )
+
+        Single singleMail ->
+            handleSingleMail ( model, singleMail )
+
+
+handleSingleMail : ( Model model msg, SingleMail msg ) -> ( Model model msg, Cmd (Msg msg) )
+handleSingleMail ( model, mail ) =
     case mail of
         Letter_ letter ->
             handleLetter letter model
@@ -404,7 +437,7 @@ encodeMaybe maybe encoder =
 -}
 cmd : Cmd msg -> Mail msg
 cmd =
-    Cmd
+    Single << Cmd
 
 
 {-| Construct a letter. The `String` parameter is the "address" your `Encode.Value` will reach. The address is defined as the key in the javascript object given to `PortsMail` in your javascript. In the following case its `"getRandomNumber"`
@@ -446,7 +479,7 @@ toMsgDecoder decoder ctor =
 -}
 send : Letter msg -> Mail msg
 send =
-    Letter_
+    Single << Letter_
 
 
 {-| No `Mail` to send, just like..
@@ -473,8 +506,19 @@ none =
 map : (a -> b) -> Mail a -> Mail b
 map ctor mail =
     case mail of
+        Batched singleMails ->
+            Batched (List.map (mapSingle ctor) singleMails)
+
+        Single mail ->
+            mapSingle ctor mail
+                |> Single
+
+
+mapSingle : (a -> b) -> SingleMail a -> SingleMail b
+mapSingle ctor mail =
+    case mail of
         Letter_ (Letter funcName json Nothing) ->
-            Letter_ (Letter funcName json Nothing)
+            (Letter_) (Letter funcName json Nothing)
 
         Letter_ (Letter funcName json (Just decoder)) ->
             decoder
@@ -485,3 +529,33 @@ map ctor mail =
 
         Cmd cmd ->
             Cmd (Cmd.map ctor cmd)
+
+
+{-| Batch a list of Mail so that each one is executed after eachother.
+This allows you to send multiple letters at once and is equivalent to Cmd.batch.
+
+    Mail.batch [StoreFirebaseUser, StoreFirebaseMessage]
+
+-}
+batch : List (Mail msg) -> Mail msg
+batch =
+    List.foldr
+        (\batchedMails mail ->
+            case mail of
+                Single m1 ->
+                    case batchedMails of
+                        Batched mails ->
+                            Batched (mails ++ [ m1 ])
+
+                        Single m2 ->
+                            Batched [ m1, m2 ]
+
+                Batched mailList1 ->
+                    case batchedMails of
+                        Batched mailList2 ->
+                            Batched (mailList1 ++ mailList2)
+
+                        Single m1 ->
+                            Batched (mailList1 ++ [ m1 ])
+        )
+        (Batched [])
