@@ -25,7 +25,7 @@ module Ports.Mail
 
 # Program
 
-@docs Program, program
+@docs Program, program, programWithFlags, programWithNavigation, programWithNavigationAndFlags
 
 -}
 
