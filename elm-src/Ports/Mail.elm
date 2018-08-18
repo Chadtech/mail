@@ -32,6 +32,7 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import Platform
 import Platform.Cmd
+import Navigation
 
 
 -- TYPES --
@@ -178,6 +179,52 @@ programWithFlags manifest =
     , subscriptions = subscriptions manifest.subscriptions
     }
         |> Html.programWithFlags
+
+
+{-| The same as `Navigation.programWithFlags` with two exceptions. First the model takes toJs and fromJs ports. Second, the init and update functions return `(model, Mail msg)` instead of `(model, Cmd msg)`. You can still issue `Cmd msg`s, just through the `Mail.cmd` function. The toJs and fromJs ports *must* have the following names and type signatures.
+To read more about the Navigation library: <http://package.elm-lang.org/packages/elm-lang/navigation>
+-}
+programWithNavigationAndFlags :
+    (Navigation.Location -> Msg msg)
+    ->
+        { init : flags -> Navigation.Location -> ( model, Mail msg )
+        , update : msg -> model -> ( model, Mail msg )
+        , view : model -> Html msg
+        , subscriptions : model -> Sub msg
+        , toJs : Value -> Cmd msg
+        , fromJs : (Value -> Msg msg) -> Sub (Msg msg)
+        }
+    -> Platform.Program flags (Model model msg) (Msg msg)
+programWithNavigationAndFlags locationToMsg manifest =
+    { init = (\flags location -> init manifest.toJs manifest.fromJs manifest.update (manifest.init flags location))
+    , update = update manifest.update
+    , view = view manifest.view
+    , subscriptions = subscriptions manifest.subscriptions
+    }
+        |> Navigation.programWithFlags locationToMsg
+
+
+{-| The same as `Navigation.program` with two exceptions. First the model takes toJs and fromJs ports. Second, the init and update functions return `(model, Mail msg)` instead of `(model, Cmd msg)`. You can still issue `Cmd msg`s, just through the `Mail.cmd` function. The toJs and fromJs ports *must* have the following names and type signatures.
+To read more about the Navigation library: <http://package.elm-lang.org/packages/elm-lang/navigation>
+-}
+programWithNavigation :
+    (Navigation.Location -> Msg msg)
+    ->
+        { init : Navigation.Location -> ( model, Mail msg )
+        , update : msg -> model -> ( model, Mail msg )
+        , view : model -> Html msg
+        , subscriptions : model -> Sub msg
+        , toJs : Value -> Cmd msg
+        , fromJs : (Value -> Msg msg) -> Sub (Msg msg)
+        }
+    -> Platform.Program Never (Model model msg) (Msg msg)
+programWithNavigation locationToMsg manifest =
+    { init = (\location -> init manifest.toJs manifest.fromJs manifest.update (manifest.init location))
+    , update = update manifest.update
+    , view = view manifest.view
+    , subscriptions = subscriptions manifest.subscriptions
+    }
+        |> Navigation.program locationToMsg
 
 
 view : (model -> Html msg) -> Model model msg -> Html (Msg msg)
