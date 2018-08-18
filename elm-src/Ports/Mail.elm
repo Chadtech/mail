@@ -3,6 +3,9 @@ module Ports.Mail
         ( Letter
         , Mail
         , Program
+        , programWithFlags
+        , programWithNavigation
+        , programWithNavigationAndFlags
         , cmd
         , expectResponse
         , letter
