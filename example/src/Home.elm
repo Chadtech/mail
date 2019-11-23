@@ -1,18 +1,18 @@
-module Home
-    exposing
-        ( Model
-        , Msg
-        , init
-        , update
-        , view
-        )
+module Home exposing
+    ( Model
+    , Msg
+    , init
+    , update
+    , view
+    )
 
-import Html exposing (Html, button, div, input, p)
-import Html.Attributes exposing (value)
-import Html.Events exposing (onClick, onInput)
+import Browser.Mail as Mail exposing (Mail)
+import Html exposing (Html)
+import Html.Attributes as Attrs
+import Html.Events as Events
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Ports.Mail as Mail exposing (Mail)
+
 
 
 -- TYPES --
@@ -28,7 +28,7 @@ type alias Model =
 type Msg
     = FieldUpdated String
     | SquareClicked
-    | SquareReceived (Result String Int)
+    | SquareReceived (Result Decode.Error Int)
 
 
 init : Model
@@ -51,10 +51,10 @@ update msg model =
                 | field = str
                 , number =
                     case String.toInt str of
-                        Ok number ->
+                        Just number ->
                             number
 
-                        Err _ ->
+                        Nothing ->
                             model.number
               }
             , Mail.none
@@ -87,12 +87,12 @@ update msg model =
 
 view : String -> Model -> Html Msg
 view username model =
-    div
+    Html.div
         []
-        [ p
+        [ Html.p
             []
             [ welcomeText username ]
-        , p
+        , Html.p
             []
             [ """
                 Type the number you would like to
@@ -101,13 +101,13 @@ view username model =
               """
                 |> Html.text
             ]
-        , input
-            [ onInput FieldUpdated
-            , value model.field
+        , Html.input
+            [ Events.onInput FieldUpdated
+            , Attrs.value model.field
             ]
             []
-        , button
-            [ onClick SquareClicked ]
+        , Html.button
+            [ Events.onClick SquareClicked ]
             [ Html.text "square" ]
         , squareView model
         ]
@@ -117,9 +117,9 @@ squareView : Model -> Html Msg
 squareView model =
     case model.result of
         Just ( number, square ) ->
-            div
+            Html.div
                 []
-                [ p
+                [ Html.p
                     []
                     [ squareText number square ]
                 ]
@@ -130,9 +130,9 @@ squareView model =
 
 squareText : Int -> Int -> Html Msg
 squareText number square =
-    [ toString number
+    [ String.fromInt number
     , "squared is"
-    , toString square ++ "!"
+    , String.fromInt square ++ "!"
     ]
         |> String.join " "
         |> Html.text

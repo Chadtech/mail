@@ -1,16 +1,17 @@
-port module Main exposing (..)
+port module Main exposing (Model, Msg(..), Page(..), errorView, fromJs, init, main, setPage, toJs, update, view)
 
+import Browser.Mail as Browser exposing (Mail)
 import Home
 import Html exposing (Html)
 import Json.Encode exposing (Value)
 import Login
-import Ports.Mail as Mail exposing (Mail)
+
 
 
 -- MAIN --
 
 
-main : Mail.Program Never Model Msg
+main : Browser.Program Never Model Msg
 main =
     { init = init
     , update = update
@@ -19,7 +20,7 @@ main =
     , toJs = toJs
     , fromJs = fromJs
     }
-        |> Mail.program
+        |> Browser.element
 
 
 
@@ -48,7 +49,7 @@ init =
     ( { page = Login Login.init
       , user = Nothing
       }
-    , Mail.none
+    , Browser.none
     )
 
 
@@ -69,7 +70,7 @@ update msg model =
                     case reply of
                         Login.NoReply ->
                             ( setPage model Login newSubModel
-                            , Mail.map LoginMsg mail
+                            , Browser.map LoginMsg mail
                             )
 
                         Login.SetUser username ->
@@ -77,11 +78,11 @@ update msg model =
                                 | user = Just username
                                 , page = Home Home.init
                               }
-                            , Mail.map LoginMsg mail
+                            , Browser.map LoginMsg mail
                             )
 
                 _ ->
-                    ( model, Mail.none )
+                    ( model, Browser.none )
 
         HomeMsg subMsg ->
             case model.page of
@@ -89,10 +90,10 @@ update msg model =
                     subModel
                         |> Home.update subMsg
                         |> Tuple.mapFirst (setPage model Home)
-                        |> Tuple.mapSecond (Mail.map HomeMsg)
+                        |> Tuple.mapSecond (Browser.map HomeMsg)
 
                 _ ->
-                    ( model, Mail.none )
+                    ( model, Browser.none )
 
 
 setPage : Model -> (subModel -> Page) -> subModel -> Model
