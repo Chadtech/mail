@@ -1,130 +1,70 @@
 # Mail
 
-Heres a common story: you are working on an Elm project, but you really need some value thats only obtainable from the JavaScript side of things. Im talking about values from..
-- The api client you use to make http requests, maybe to firebase or aws, or your old in-house api client written in JavaScript.
-- That one weird JavaScript package that is super useful and stable but also hard to port into Elm given your project constraints.
-- The application your Elm code is embedded into.
+This package provides an api for Elm ports that behaves similarly to http requests. In the same code where you send a message from Elm to JS, you can write the code for how you expect the response to come in as.
 
-The answer to all these problems is ports. Your Elm app should send a message out to the JS-side of things through a port, telling the JavaScript to do such-and-such behavior, 
-whereafter the JavaScript sends the resulting value back into Elm through another port.
+To get started, just skip down to the "How do I use this?" section.
 
-My estimation is that about 75% of the time people use ports in Elm projects, they are doing so in a request-response kind of way: they are requesting a value, and they are waiting for a value in response. The problem is Elm ports arent really built in a request-response kind of way. Outgoing and incoming ports are completely de-coupled without any assumption of a value coming back. Since Elm developers often need response values, they are often deliberately coupling outgoing and incoming ports manually. Here is a step by step of what code you would have to write to build a complete circuit from Elm to JS and back:
+## Background
+In Elm, JS interop is done through ports, and its a well known aspect of ports that they are "one way" or "fire and forget"; meaning, a message sent from Elm to JavaScript (or vice versa) is simply sent off with no awareness of how it was received and no expectation of a response. 
 
-1. Build an outgoing port for your request that routes your outgoing value to the right JavaScript function
-2. Write the code that builds a payload and passes it through that outgoing port
-3. Listen for the outgoing port on the JS side of your app, consume the payload, and return the value
-4. Build the incoimng port that routes your incoming value to the right place
+The trouble some people find is that their use case does in fact expect a response. For example, they want their Elm application reach out into JavaScript to get the api token from their third party authentication SDK (like Firebase, or Amazon Cognito). They expect a response in the form of the api token when they request it.
 
-To add a single port you are necessarily touching four parts of your code base, merely to add really tedious lines of code like `"incomingMsg" -> IncomingMsg`. This doesnt scale very well.
+The correct way of writing this code in Elm  feels like they needing to write twice as much code. One can't just code one channel of communication for their request; one has to write code for the to-js channel and code for the from-js channel, for every communication they would like to make.
 
-`Chadtech/mail` eliminates steps 1 and 4 in that process. `Mail` treats Elm ports like http requests and handles all the routing internally. Heres how the code in practice looks
+This package makes those ports communications feel "one channel" again. You write the request, and how you expect the response in one spot of your Elm code.
 
+## Is it good idea to use this?
+I dont know, probably not. You don't need this package to streamline Elm ports. This was made mostly for fun and as a demonstration.
+
+Also, coding in an expectation of a response creates new problems. For example, theres now state inside `Browser.Mail` that remembers which requests were made and what response they expect. If a request is made with the expectation of a response and that response never comes in, then that state hangs around forever. More requests are made, some of them never complete, so now you have a memory leak in your code. That state will just balloon bigger and bigger over time and eventually consume the entire universe. Thanks.
+
+Maybe you wont have this problem. Its very plausible that you could write flawless code where every request gets a response or at least gets pruned if it takes too long.
+
+## How to use this module
+
+Definitely look at the example project, first of all; it is under `example/` in the github repo.
+
+What you will need in your Elm code are these exact two ports..
 ```elm
--- Login.elm
-import Ports.Mail as Mail exposing (Mail)
+port fromJs : (Decode.Value -> msg) -> Sub msg
 
-
-mailLogin : Model -> Mail Msg
-mailLogin model =
-    [ ( "username", Encode.string model.username )
-    , ( "password", Encode.string model.password )
-    ]
-        |> Encode.object
-        |> Mail.letter "login"
-        |> Mail.expectResponse loginDecoder LoginResult
-        |> Mail.send
-
-    -- ..
-
-    SubmitClicked ->
-        ( model, mailLogin model )
-
-    LoginResult (Ok login) ->
-        -- ..
+port toJs : Encode.Value -> Cmd msg
 ```
-```js
-// app.js
-var PortsMail = require("ports-mail");
-var app = Elm.Main.fullscreen();
-
-PortsMail(app, { login: apiClient.login });
-```
-
-In the code above `Mail.letter "login" json` says mail this json to the address `"login"`. `Mail.expectResponse` says we expect json in reply in the shape of `loginDecoder`, and we want it routed to come in via the `Msg` `LoginResult`. The entire specification of what is going on is handled in these few lines of code with no ports or subscriptions.
-
-On the JavaScript side of things `PortsMail` initializes the elm app. The address is really just the key in a javascript object. The value of that key is a function, whos first argument is the payload from Elm, and whos second argument is the call back to send the value back into Elm. Something like..
-
-```js
-PortsMail(app, { 
-    getCurrentTime: function(payload, reply){
-        reply(new Date().getTime());
-    }
-});
-```
-
-# Getting Started
-
-Please study the code in the example folder so you know what you are in for. To install everything, type..
-
-```
-elm package install Chadtech/mail --yes
-npm install chadtech-mail --save
-```
-
-Then, in your main Elm file, copy and paste in these ports..
-
+..then give them to your main `Program`..
 ```elm
-port fromJs : (Value -> msg) -> Sub msg
-
-
-port toJs : Value -> Cmd msg
-```
-
-..make sure your main module is a ports module..
-
-```elm
-port module Main exposing (..)
-```
-
-..And finally import and initialize a `Mail.program`..
-
-```elm
-import Ports.Mail as Mail exposing (Mail)
-
-main : Mail.Program Never Model Msg
+main : Mail.Program Decode.Value Model Msg
 main =
-    { init = init
-    , update = update
-    , view = view
-    , subscriptions = always Sub.none
-    , toJs = toJs
-    , fromJs = fromJs
-    }
-        |> Mail.program
+    Mail.document
+        { init = init
+        , update = update
+        , view = view
+        , subscriptions = subscriptions
+        , toJs = toJs
+        , fromJs = fromJs
+        }
 ```
-
-Please note, `Mail.Program` update and init functions dont return `(Model, Cmd Msg)`, they return `(Model, Mail Msg)` instead. Dont worry, you can still use `Cmd`s, just do `Mail.cmd yourCmd`, which is `Mail.cmd : Cmd Msg -> Mail Msg`.
-
-Finally, in your javascript, initialize your app like this
-
+..and finally, in your JS code, you need something like this code snippet below; where `app` is your Elm application, and  `actions` is an object with values that are functions of type ..
 ```js
-var PortsMail = require("chadtech-mail");
-var app = Elm.Main.fullscreen();
-
-function address0(payload, reply){
-    // ..
-    reply(valueForElm);
+function square(payload, callbackToElm) {
+    callbackToElm(payload * payload);
 }
 
-function address1(payload, reply){
-    // ..
-    reply(4);
+var actions = {
+    square: square,
 }
 
-PortsMail(app, { 
-    address0,
-    address1
-});
+app.ports.toJs.subscribe(function(msg){
+    // msg : { address : String, thread : Int, payload: json }
+    var action = actions[msg.address];
+    if (typeof action === "undefined") {
+    	console.log("Unrecognized js msg type ->", msg.type);
+        return;
+    }
+    action(msg.payload, function(payload) {
+        app.ports.fromJs.send({
+            thread: msg.thread,
+            payload: payload
+        });
+    });
+})
 ```
-
-
