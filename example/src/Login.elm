@@ -1,19 +1,20 @@
-module Login
-    exposing
-        ( Model
-        , Msg
-        , Reply(..)
-        , init
-        , update
-        , view
-        )
+module Login exposing
+    ( Model
+    , Msg
+    , init
+    , update
+    , view
+    )
 
-import Html exposing (Html, br, button, div, input, p)
+import Browser.Mail as Mail exposing (Mail)
+import Browser.Navigation as Nav
+import Html exposing (Html)
 import Html.Attributes exposing (type_, value)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Ports.Mail as Mail exposing (Mail)
+import Route
+
 
 
 -- TYPES --
@@ -23,13 +24,15 @@ type alias Model =
     { username : String
     , password : String
     , wrongPassword : Bool
+    , user : Maybe String
+    , navKey : Nav.Key
     }
 
 
 type Msg
     = FieldUpdated Field String
     | SubmitClicked
-    | LoginFinished (Result String String)
+    | LoginFinished (Result Decode.Error String)
 
 
 type Field
@@ -37,20 +40,17 @@ type Field
     | Password
 
 
-type Reply
-    = NoReply
-    | SetUser String
-
-
 
 -- INIT --
 
 
-init : Model
-init =
+init : Nav.Key -> Model
+init navKey =
     { username = ""
     , password = ""
     , wrongPassword = False
+    , user = Nothing
+    , navKey = navKey
     }
 
 
@@ -58,37 +58,32 @@ init =
 -- UPDATE --
 
 
-update : Msg -> Model -> ( Model, Mail Msg, Reply )
+update : Msg -> Model -> ( Model, Mail Msg )
 update msg model =
     case msg of
         FieldUpdated Username str ->
             ( { model | username = str }
             , Mail.none
-            , NoReply
             )
 
         FieldUpdated Password str ->
             ( { model | password = str }
             , Mail.none
-            , NoReply
             )
 
         SubmitClicked ->
             ( model
             , mailLogin model
-            , NoReply
             )
 
-        LoginFinished (Ok username) ->
-            ( model
-            , Mail.none
-            , SetUser username
+        LoginFinished (Ok user) ->
+            ( { model | user = Just user }
+            , Route.goTo model.navKey Route.Home
             )
 
         LoginFinished (Err _) ->
             ( { model | wrongPassword = True }
             , Mail.none
-            , NoReply
             )
 
 
@@ -113,39 +108,38 @@ loginPayload model =
 -- VIEW --
 
 
-view : Model -> Html Msg
+view : Model -> List (Html Msg)
 view model =
-    div
+    [ Html.p
         []
-        [ p
-            []
-            [ Html.text "username" ]
-        , input
-            [ value model.username
-            , onInput (FieldUpdated Username)
-            ]
-            []
-        , p
-            []
-            [ Html.text "password (hint: its \"password\")" ]
-        , input
-            [ value model.password
-            , onInput (FieldUpdated Password)
-            , type_ "password"
-            ]
-            []
-        , wrongPasswordView model
-        , button
-            [ onClick SubmitClicked ]
-            [ Html.text "Submit" ]
+        [ Html.text "username" ]
+    , Html.input
+        [ value model.username
+        , onInput (FieldUpdated Username)
         ]
+        []
+    , Html.p
+        []
+        [ Html.text "password (hint: its \"password\")" ]
+    , Html.input
+        [ value model.password
+        , onInput (FieldUpdated Password)
+        , type_ "password"
+        ]
+        []
+    , wrongPasswordView model
+    , Html.button
+        [ onClick SubmitClicked ]
+        [ Html.text "Submit" ]
+    ]
 
 
 wrongPasswordView : Model -> Html Msg
 wrongPasswordView model =
     if model.wrongPassword then
-        p
+        Html.p
             []
             [ Html.text "You entered the wrong password!" ]
+
     else
-        br [] []
+        Html.br [] []

@@ -1,56 +1,86 @@
-port module Main exposing (Model, Msg(..), Page(..), errorView, fromJs, init, main, setPage, toJs, update, view)
+port module Main exposing (main)
 
-import Browser.Mail as Browser exposing (Mail)
+import Browser exposing (UrlRequest)
+import Browser.Mail as Mail exposing (Mail)
+import Browser.Navigation as Nav
 import Home
 import Html exposing (Html)
+import Json.Decode as Decode
 import Json.Encode exposing (Value)
 import Login
+import Route exposing (Route)
+import Url exposing (Url)
 
 
 
 -- MAIN --
 
 
-main : Browser.Program Never Model Msg
+main : Mail.Program Decode.Value Model Msg
 main =
     { init = init
     , update = update
     , view = view
     , subscriptions = always Sub.none
+    , onUrlRequest = UrlRequested
+    , onUrlChange = UrlChanged << Route.fromUrl
     , toJs = toJs
     , fromJs = fromJs
     }
-        |> Browser.element
+        |> Mail.application
+
+
+init : Decode.Value -> Url -> Nav.Key -> ( Model, Mail Msg )
+init _ url key =
+    Login (Login.init key)
+        |> handleRoute (Route.fromUrl url)
 
 
 
 -- TYPES --
 
 
-type alias Model =
-    { page : Page
-    , user : Maybe String
-    }
+type Model
+    = Login Login.Model
+    | Home Home.Model
+    | Error Nav.Key String
 
 
 type Msg
     = LoginMsg Login.Msg
     | HomeMsg Home.Msg
+    | UrlRequested UrlRequest
+    | UrlChanged (Maybe Route)
 
 
-type Page
-    = Login Login.Model
-    | Home Home.Model
-    | Error
+
+-- HELPERS --
 
 
-init : ( Model, Mail Msg )
-init =
-    ( { page = Login Login.init
-      , user = Nothing
-      }
-    , Browser.none
-    )
+getUser : Model -> Maybe String
+getUser model =
+    case model of
+        Login subModel ->
+            subModel.user
+
+        Home subModel ->
+            Just subModel.user
+
+        Error _ _ ->
+            Nothing
+
+
+getNavKey : Model -> Nav.Key
+getNavKey model =
+    case model of
+        Login subModel ->
+            subModel.navKey
+
+        Home subModel ->
+            subModel.navKey
+
+        Error navKey _ ->
+            navKey
 
 
 
@@ -61,75 +91,85 @@ update : Msg -> Model -> ( Model, Mail Msg )
 update msg model =
     case msg of
         LoginMsg subMsg ->
-            case model.page of
+            case model of
                 Login subModel ->
-                    let
-                        ( newSubModel, mail, reply ) =
-                            Login.update subMsg subModel
-                    in
-                    case reply of
-                        Login.NoReply ->
-                            ( setPage model Login newSubModel
-                            , Browser.map LoginMsg mail
-                            )
-
-                        Login.SetUser username ->
-                            ( { model
-                                | user = Just username
-                                , page = Home Home.init
-                              }
-                            , Browser.map LoginMsg mail
-                            )
+                    Login.update subMsg subModel
+                        |> Tuple.mapFirst Login
+                        |> Tuple.mapSecond (Mail.map LoginMsg)
 
                 _ ->
-                    ( model, Browser.none )
+                    ( model, Mail.none )
 
         HomeMsg subMsg ->
-            case model.page of
+            case model of
                 Home subModel ->
-                    subModel
-                        |> Home.update subMsg
-                        |> Tuple.mapFirst (setPage model Home)
-                        |> Tuple.mapSecond (Browser.map HomeMsg)
+                    Home.update subMsg subModel
+                        |> Tuple.mapFirst Home
+                        |> Tuple.mapSecond (Mail.map HomeMsg)
 
                 _ ->
-                    ( model, Browser.none )
+                    ( model, Mail.none )
+
+        UrlRequested urlRequest ->
+            ( model, Mail.none )
+
+        UrlChanged maybeRoute ->
+            handleRoute maybeRoute model
 
 
-setPage : Model -> (subModel -> Page) -> subModel -> Model
-setPage model pageCtor subModel =
-    { model | page = pageCtor subModel }
+handleRoute : Maybe Route -> Model -> ( Model, Mail msg )
+handleRoute maybeRoute model =
+    let
+        navKey : Nav.Key
+        navKey =
+            getNavKey model
+    in
+    case maybeRoute of
+        Just Route.Home ->
+            case getUser model of
+                Just user ->
+                    ( Home.init navKey { user = user }
+                        |> Home
+                    , Mail.none
+                    )
+
+                Nothing ->
+                    ( model
+                    , Route.goTo navKey Route.Login
+                    )
+
+        Just Route.Login ->
+            ( Login.init navKey
+                |> Login
+            , Mail.none
+            )
+
+        Nothing ->
+            ( model, Mail.none )
 
 
 
 -- VIEW --
 
 
-view : Model -> Html Msg
+view : Model -> Browser.Document Msg
 view model =
-    case model.page of
-        Home subModel ->
-            case model.user of
-                Just user ->
-                    subModel
-                        |> Home.view user
-                        |> Html.map HomeMsg
+    { title = "Squarer"
+    , body =
+        case model of
+            Home subModel ->
+                subModel
+                    |> Home.view
+                    |> List.map (Html.map HomeMsg)
 
-                Nothing ->
-                    errorView
+            Login subModel ->
+                subModel
+                    |> Login.view
+                    |> List.map (Html.map LoginMsg)
 
-        Login subModel ->
-            subModel
-                |> Login.view
-                |> Html.map LoginMsg
-
-        Error ->
-            errorView
-
-
-errorView : Html Msg
-errorView =
-    Html.text "Oh no something went wrong"
+            Error _ errorText ->
+                [ Html.text errorText ]
+    }
 
 
 

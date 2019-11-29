@@ -2,7 +2,9 @@ module Browser.Mail exposing
     ( Letter
     , Mail
     , Program
+    , application
     , cmd
+    , document
     , element
     , expectResponse
     , letter
@@ -11,11 +13,13 @@ module Browser.Mail exposing
     , send
     )
 
-import Browser
+import Browser exposing (UrlRequest)
+import Browser.Navigation as Navigation
 import Dict exposing (Dict)
 import Html exposing (Html)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
+import Url
 
 
 type alias Program json model msg =
@@ -63,10 +67,67 @@ element args =
                 , toJs = args.toJs
                 , fromJs = args.fromJs
                 }
-        , view = makeView args.view
+        , view = .appModel >> args.view >> Html.map AppMsg
         , update = update args.update
         , subscriptions = makeSubscriptions args.subscriptions
         }
+
+
+application :
+    { init : flags -> Url.Url -> Navigation.Key -> ( model, Mail msg )
+    , view : model -> Browser.Document msg
+    , update : msg -> model -> ( model, Mail msg )
+    , subscriptions : model -> Sub msg
+    , onUrlRequest : UrlRequest -> msg
+    , onUrlChange : Url.Url -> msg
+    , toJs : Decode.Value -> Cmd msg
+    , fromJs : (Decode.Value -> Msg msg) -> Sub (Msg msg)
+    }
+    -> Program flags model msg
+application args =
+    Browser.application
+        { init =
+            makeApplicationInit
+                { init = args.init
+                , toJs = args.toJs
+                , fromJs = args.fromJs
+                }
+        , view = .appModel >> args.view >> mapDocument
+        , update = update args.update
+        , subscriptions = makeSubscriptions args.subscriptions
+        , onUrlRequest = args.onUrlRequest >> AppMsg
+        , onUrlChange = args.onUrlChange >> AppMsg
+        }
+
+
+document :
+    { init : flags -> ( model, Mail msg )
+    , view : model -> Browser.Document msg
+    , update : msg -> model -> ( model, Mail msg )
+    , subscriptions : model -> Sub msg
+    , toJs : Decode.Value -> Cmd msg
+    , fromJs : (Decode.Value -> Msg msg) -> Sub (Msg msg)
+    }
+    -> Program flags model msg
+document args =
+    Browser.document
+        { init =
+            makeInit
+                { init = args.init
+                , toJs = args.toJs
+                , fromJs = args.fromJs
+                }
+        , view = .appModel >> args.view >> mapDocument
+        , update = update args.update
+        , subscriptions = makeSubscriptions args.subscriptions
+        }
+
+
+mapDocument : Browser.Document msg -> Browser.Document (Msg msg)
+mapDocument doc =
+    { title = doc.title
+    , body = List.map (Html.map AppMsg) doc.body
+    }
 
 
 makeSubscriptions :
@@ -100,11 +161,29 @@ update appUpdate msg model =
             handleIncomingPort appUpdate json model
 
 
-makeView : (model -> Html msg) -> Model model msg -> Html (Msg msg)
-makeView view model =
-    model.appModel
-        |> view
-        |> Html.map AppMsg
+makeApplicationInit :
+    { init : flags -> Url.Url -> Navigation.Key -> ( model, Mail msg )
+    , toJs : Decode.Value -> Cmd msg
+    , fromJs : (Decode.Value -> Msg msg) -> Sub (Msg msg)
+    }
+    -> flags
+    -> Url.Url
+    -> Navigation.Key
+    -> ( Model model msg, Cmd (Msg msg) )
+makeApplicationInit args flags url key =
+    let
+        ( firstAppModel, firstMail ) =
+            args.init flags url key
+    in
+    handleMail
+        { appModel = firstAppModel
+        , threads = Dict.empty
+        , freeThreads = []
+        , threadCount = 0
+        , toJs = args.toJs
+        , fromJs = args.fromJs
+        }
+        firstMail
 
 
 makeInit :

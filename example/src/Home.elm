@@ -7,6 +7,7 @@ module Home exposing
     )
 
 import Browser.Mail as Mail exposing (Mail)
+import Browser.Navigation as Nav
 import Html exposing (Html)
 import Html.Attributes as Attrs
 import Html.Events as Events
@@ -22,6 +23,8 @@ type alias Model =
     { field : String
     , number : Int
     , result : Maybe ( Int, Int )
+    , user : String
+    , navKey : Nav.Key
     }
 
 
@@ -31,11 +34,13 @@ type Msg
     | SquareReceived (Result Decode.Error Int)
 
 
-init : Model
-init =
+init : Nav.Key -> { user : String } -> Model
+init navKey { user } =
     { field = ""
     , number = 0
     , result = Nothing
+    , user = user
+    , navKey = navKey
     }
 
 
@@ -85,32 +90,30 @@ update msg model =
 -- VIEW --
 
 
-view : String -> Model -> Html Msg
-view username model =
-    Html.div
+view : Model -> List (Html Msg)
+view model =
+    [ Html.p
         []
-        [ Html.p
-            []
-            [ welcomeText username ]
-        , Html.p
-            []
-            [ """
+        [ welcomeText model.user ]
+    , Html.p
+        []
+        [ """
                 Type the number you would like to
                 square in the field below, click
                 "square" and watch the magic happen.
               """
-                |> Html.text
-            ]
-        , Html.input
-            [ Events.onInput FieldUpdated
-            , Attrs.value model.field
-            ]
-            []
-        , Html.button
-            [ Events.onClick SquareClicked ]
-            [ Html.text "square" ]
-        , squareView model
+            |> Html.text
         ]
+    , Html.input
+        [ Events.onInput FieldUpdated
+        , Attrs.value model.field
+        ]
+        []
+    , Html.button
+        [ Events.onClick SquareClicked ]
+        [ Html.text "square" ]
+    , squareView model
+    ]
 
 
 squareView : Model -> Html Msg
@@ -119,10 +122,7 @@ squareView model =
         Just ( number, square ) ->
             Html.div
                 []
-                [ Html.p
-                    []
-                    [ squareText number square ]
-                ]
+                [ squareText number square ]
 
         Nothing ->
             Html.text ""
